@@ -150,3 +150,22 @@ python3 scripts/validate_rust_native.py --home /absolute/path/to/private-staging
 Rust 真实会话 harness 拒绝活动 Codex home 及共享认证文件链接，使用 staging 文件认证并剥离继承的 `OPENAI_API_KEY` / `CODEX_API_KEY`。使用自定义 provider 的其他认证环境或外部凭据代理时，须先单独隔离；该脚本不提供任意 provider 的凭据隔离保证。
 
 本轮 Rust 的真实执行、负向控制及适配审计记录见 [Rust 验收记录](docs/validation/2026-11-19-rust.md)。
+
+
+## 可选的自动检查与补救守卫
+
+本配置增加原生 lifecycle hooks：启动时注入工作流提示，写入前检查计划、人工批准、worktree 与独立计划审查，结束时核对当前源码的检查结果、独立审计及发现关闭记录。可自动补救的证据缺口最多续跑两次；等待人工批准、MCP 缺失和暂停会保留阻塞状态。
+
+显式启用：
+
+```sh
+python3 install.py --workflow-hooks
+```
+
+先在隔离 home 与测试工程验收，再用于日常环境。安装器先备份，只合并本包拥有的 hook，保留其他 hook、RTK、模型和凭据设置；全新安装默认不启用；普通升级会保留已有启用状态。需要关闭时使用 `python3 install.py --without-workflow-hooks`。新 hook 必须经宿主原生界面审阅和信任，安装成功不等于 hook 已运行。不得手工伪造信任记录。CLI 可通过 `/hooks` 检查；Desktop 必须观察当前版本实际回执。
+
+计划采用明确批准行 `批准计划 <计划摘要>`，避免否定或引用语句误触批准。计划或检查命令变化后摘要会改变。详细过程见 [守卫协议](skills/codex-workflow/references/guard.md)。
+
+这属于工程流程门禁，不能替代沙箱权限：宿主不覆盖的工具、任意 shell 程序和 hook 超时/故障仍需单独检查。其他 Stop hook 也可能阻止自动续跑。缺失 quality MCP 时可以明确降级调查，但不能获得守卫最终验收通过。
+
+实际原生 CLI 与 Desktop 的分层验收结果见 [守卫验证记录](docs/validation/2026-11-19-guard.md)，包括独立审计发现问题后由原执行会话修复、复验和重新审计的闭环，以及尚未实测的权限弹窗边界。

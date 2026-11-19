@@ -2,10 +2,12 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -38,6 +40,82 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(oc.read_text(), '{"unchanged":true}')
             self.assertFalse((home / '.config/mycodexconfig/settings.json').exists())
 
+    def test_native_multiline_values_preserved(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            install.install(home)
+            config = home / '.codex/config.toml'
+            native = '[tui]\nvalue = """hello\n[brackets]\n"""\narray = [\n[1, 2],\n[3, 4]\n]\n'
+            config.write_text(config.read_text().replace(install.END, native + install.END))
+            install.install(home, workflow_hooks=True)
+            self.assertEqual(install.tomllib.loads(config.read_text())['tui'],
+                             install.tomllib.loads(native)['tui'])
+
+    def test_managed_mcp_extensions_refused_without_loss(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            install.install(home)
+            config = home / '.codex/config.toml'
+            original = config.read_text().replace(install.END, '[mcp_servers.quality.env]\nCUSTOM = "fixture"\n' + install.END)
+            config.write_text(original)
+            with self.assertRaisesRegex(ValueError, 'Ambiguous managed MCP extension'):
+                install.install(home, workflow_hooks=True)
+            self.assertEqual(config.read_text(), original)
+
+    def test_failed_install_rollback_preserves_newer_config(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            config = home / '.codex/config.toml'
+            hooks = home / '.codex/hooks.json'
+            actual = install.atomic
+            newer = []
+            def update(path, data):
+                actual(path, data)
+                if path == config:
+                    newer.append(data + b'\n[tui]\nscreen_reader_detection_done = true\n')
+                    config.write_bytes(newer[-1])
+                    hooks.write_text('{"hooks":{},"description":"concurrent"}')
+            with patch.object(install, 'atomic', side_effect=update):
+                with self.assertRaisesRegex(ValueError, 'Partial rollback; preserved concurrent edits'):
+                    install.install(home, workflow_hooks=True)
+            self.assertEqual(config.read_bytes(), newer[-1])
+            self.assertEqual(json.loads(hooks.read_text())['description'], 'concurrent')
+
+    def test_config_concurrent_update_refused_at_both_checkpoints(self):
+        for checkpoint in ('payload', 'deploy_release'):
+            with self.subTest(checkpoint=checkpoint), tempfile.TemporaryDirectory() as td:
+                home = self.home(td)
+                config = home / '.codex/config.toml'
+                original = config.read_bytes()
+                newer = original + b'\n[tui]\nscreen_reader_detection_done = true\n'
+                actual = getattr(install, checkpoint)
+                def update(*args, **kwargs):
+                    config.write_bytes(newer)
+                    return actual(*args, **kwargs)
+                with patch.object(install, checkpoint, side_effect=update):
+                    with self.assertRaisesRegex(ValueError, 'Concurrent change'):
+                        install.install(home, workflow_hooks=True)
+                self.assertEqual(config.read_bytes(), newer)
+
+    def test_upgrade_preserves_native_tables_inserted_inside_managed_markers(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            install.install(home)
+            config = home / '.codex/config.toml'
+            native = ('[tui]\nscreen_reader_detection_done = true\n'
+                      '[hooks.state."native"]\ntrusted_hash = "fixture-trust"\n'
+                      '[[skills.config]]\npath = "/fixture/personal/SKILL.md"\nenabled = true\n')
+            config.write_text(config.read_text().replace(install.END, native + install.END))
+            result = install.install(home, workflow_hooks=True)
+            parsed = install.tomllib.loads(config.read_text())
+            self.assertTrue(parsed['tui']['screen_reader_detection_done'])
+            self.assertEqual(parsed['hooks']['state']['native']['trusted_hash'], 'fixture-trust')
+            self.assertIn({'path': '/fixture/personal/SKILL.md', 'enabled': True}, parsed['skills']['config'])
+            self.assertEqual(parsed['model'], 'existing-model')
+            self.assertEqual(install.install(home)['status'], 'UNCHANGED')
+            self.assertEqual(install.rollback(home, result['backup'])['status'], 'ROLLED_BACK')
+            self.assertIn(native, config.read_text())
+
     def test_foreign_mcp_or_skill_refused_before_change(self):
         for kind in ('mcp', 'skill'):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as td:
@@ -50,6 +128,158 @@ class InstallerTests(unittest.TestCase):
                 with self.assertRaises(ValueError): install.install(home)
                 self.assertEqual((home / '.codex/config.toml').read_bytes(), before)
                 self.assertFalse((home / '.config/mycodexconfig/settings.json').exists())
+
+    def test_workflow_hooks_opt_in_preserves_foreign_hooks_and_rolls_back(self):
+        with tempfile.TemporaryDirectory(prefix="fixture's home ") as td:
+            home = self.home(td)
+            path = home / '.codex/hooks.json'
+            rtk = {'matcher': 'Bash', 'hooks': [{'type': 'command', 'command': 'rtk hook codex'}]}
+            other = {'hooks': [{'type': 'command', 'command': 'another hook'}]}
+            original = {'description': 'Personal hooks',
+                        'hooks': {'PreToolUse': [rtk], 'SessionEnd': [other], 'Stop': [other]}}
+            before = json.dumps(original).encode()
+            path.write_bytes(before)
+            config = path.with_name('config.toml')
+            trust = '\n[hooks.state."pre_tool_use:0:0"]\ntrusted_hash = "test-trust"\n'
+            config.write_text(config.read_text() + trust)
+            result = install.install(home, workflow_hooks=True)
+            merged = json.loads(path.read_text())
+            self.assertEqual(merged['description'], original['description'])
+            self.assertEqual(merged['hooks']['PreToolUse'][0], rtk)
+            self.assertEqual(merged['hooks']['SessionEnd'], [other])
+            self.assertEqual(merged['hooks']['Stop'][0], other)
+            self.assertTrue(result['warnings'])
+            self.assertIn('SubagentStart', merged['hooks'])
+            self.assertIn(trust, config.read_text())
+            for event in install.GUARD_EVENTS:
+                handler, = merged['hooks'][event][-1]['hooks']
+                self.assertEqual(handler['statusMessage'], install.GUARD_STATUS)
+                self.assertEqual(handler['timeout'], 3 if event == 'Interrupt' else 10)
+                self.assertEqual(shlex.split(handler['command']), [
+                    str(Path(sys.executable).resolve()), str(Path(result['release']) / 'workflow/guard.py'),
+                    'hook', '--state-dir', str(home / '.local/state/mycodexconfig/guard')])
+            installed = path.read_bytes()
+            repeated = install.install(home)
+            self.assertEqual(repeated['status'], 'UNCHANGED')
+            self.assertEqual(repeated['warnings'], result['warnings'])
+            self.assertEqual(path.read_bytes(), installed)
+            disabled = install.install(home, workflow_hooks=False)
+            self.assertEqual(json.loads(path.read_text()), original)
+            install.rollback(home, disabled['backup'])
+            self.assertEqual(path.read_bytes(), installed)
+            install.rollback(home, result['backup'])
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_disabling_guard_preserves_foreign_hook_group_indices(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            path = home / '.codex/hooks.json'
+            install.install(home, workflow_hooks=True)
+            config = json.loads(path.read_text())
+            foreign = {'hooks': [{'type': 'command', 'command': 'another hook'}]}
+            config['hooks']['Stop'].append(foreign)
+            path.write_text(json.dumps(config))
+            self.assertEqual(install.install(home, workflow_hooks=True)['status'], 'UNCHANGED')
+            install.install(home, workflow_hooks=False)
+            self.assertEqual(json.loads(path.read_text())['hooks']['Stop'], [{'hooks': []}, foreign])
+
+    def test_workflow_hooks_default_upgrade_updates_command_and_reports_trust(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            path = home / '.codex/hooks.json'
+            first = install.install(home, workflow_hooks=True)
+            config = path.with_name('config.toml')
+            trust = '\n[hooks.state."session_start:0:0"]\ntrusted_hash = "test-trust"\n'
+            config.write_text(config.read_text() + trust)
+            upgraded = install.payload()
+            upgraded['tools.py'] += b'\n# Upgrade fixture\n'
+            with patch.object(install, 'payload', side_effect=lambda _: upgraded.copy()):
+                result = install.install(home)
+                self.assertEqual(install.install(home)['status'], 'UNCHANGED')
+            self.assertNotEqual(result['release'], first['release'])
+            self.assertTrue(any('Review hook trust again' in warning for warning in result['warnings']))
+            command = json.loads(path.read_text())['hooks']['SessionStart'][0]['hooks'][0]['command']
+            self.assertEqual(shlex.split(command)[1], str(Path(result['release']) / 'workflow/guard.py'))
+            self.assertIn(trust, config.read_text())
+
+    def test_workflow_hooks_warn_about_foreign_toml(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            config = home / '.codex/config.toml'
+            foreign = ('model = "existing-model"\n[features]\nhooks = false\n'
+                       '[[hooks.Stop]]\n[[hooks.Stop.hooks]]\n'
+                       'type = "command"\ncommand = "foreign hook"\n')
+            config.write_text(foreign)
+            result = install.install(home, workflow_hooks=True)
+            self.assertTrue(any('features.hooks = false' in warning for warning in result['warnings']))
+            self.assertTrue(any('Inline config.toml hooks' in warning for warning in result['warnings']))
+            self.assertTrue(config.read_text().startswith(foreign))
+
+    def test_workflow_hooks_cli_enable_preserve_disable(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            hook_file = home / '.codex/hooks.json'
+            command = [sys.executable, str(ROOT / 'install.py'), '--home', str(home)]
+            baseline = hook_file.read_bytes()
+            subprocess.check_call(command, stdout=subprocess.DEVNULL)
+            self.assertEqual(hook_file.read_bytes(), baseline)
+            subprocess.check_call(command + ['--workflow-hooks'], stdout=subprocess.DEVNULL)
+            enabled = hook_file.read_bytes()
+            self.assertNotEqual(enabled, baseline)
+            subprocess.check_call(command, stdout=subprocess.DEVNULL)
+            self.assertEqual(hook_file.read_bytes(), enabled)
+            subprocess.check_call(command + ['--without-workflow-hooks'], stdout=subprocess.DEVNULL)
+            self.assertEqual(json.loads(hook_file.read_bytes()), {'do': 'not change', 'hooks': {}})
+
+    def test_workflow_hooks_malformed_or_collision_refused_before_changes(self):
+        foreign = {'hooks': {'Stop': [{'hooks': [
+            {'type': 'command', 'command': 'unrelated', 'statusMessage': install.GUARD_STATUS}
+        ]}]}}
+        for content in ('{', '{"hooks":[]}', '{"hooks":{"Stop":[{}]}}', '{"hooks":{},"hooks":{}}',
+                        json.dumps(foreign)):
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as td:
+                home = self.home(td)
+                path = home / '.codex/hooks.json'
+                path.write_text(content)
+                before = {p.name: p.read_bytes() for p in path.parent.iterdir()}
+                with self.assertRaises(ValueError):
+                    install.install(home, workflow_hooks=True)
+                self.assertEqual({p.name: p.read_bytes() for p in path.parent.iterdir()}, before)
+                self.assertFalse((home / '.local').exists())
+
+    def test_workflow_hooks_symlink_refused(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            external = Path(td).resolve() / 'foreign-hooks.json'
+            path = home / '.codex/hooks.json'
+            path.rename(external)
+            path.symlink_to(external)
+            before = external.read_bytes()
+            with self.assertRaises(ValueError):
+                install.install(home, workflow_hooks=True)
+            self.assertTrue(path.is_symlink())
+            self.assertEqual(external.read_bytes(), before)
+            self.assertFalse((home / '.local').exists())
+
+    def test_workflow_hooks_install_failure_and_concurrent_rollback(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = self.home(td)
+            path = home / '.codex/hooks.json'
+            config = path.with_name('config.toml')
+            before = path.read_bytes(), config.read_bytes()
+            atomic = install.atomic
+            def fail_after_hooks(target, data):
+                if target == path.with_name('AGENTS.md'):
+                    raise OSError('fixture install failure')
+                atomic(target, data)
+            with patch.object(install, 'atomic', side_effect=fail_after_hooks), self.assertRaises(OSError):
+                install.install(home, workflow_hooks=True)
+            self.assertEqual((path.read_bytes(), config.read_bytes()), before)
+            result = install.install(home, workflow_hooks=True)
+            path.write_text('{"description":"concurrent user edit"}')
+            with self.assertRaisesRegex(ValueError, 'Concurrent change'):
+                install.rollback(home, result['backup'])
+            self.assertIn('[mcp_servers.quality]', config.read_text())
 
     def test_registry_preserved_and_concurrent_change_blocks_rollback(self):
         with tempfile.TemporaryDirectory() as td:
