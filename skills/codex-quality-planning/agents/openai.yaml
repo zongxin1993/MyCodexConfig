@@ -1,0 +1,5 @@
+interface:
+  display_name: "Codex Quality Planning"
+  short_description: "Quality Planning with repository rules and verified evidence"
+policy:
+  allow_implicit_invocation: true

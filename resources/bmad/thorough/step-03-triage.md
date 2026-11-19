@@ -1,5 +1,5 @@
 ---
-triage_file: '' # set at runtime: path to the triage file
+triage_context: '' # set at runtime: path to the triage file
 ---
 
 # Step 3: Triage
@@ -21,7 +21,7 @@ The objective of triage is to collect the findings from the review step, and tur
    - `location` -- file and line reference (if available)
     Do not attempt to deduplicate or group findings at this point - this breaks traceability and you don't know enough about them yet.
 
-    Write this list to `{triage_file}`, a uniquely-named temp file outside the repository, one block per finding. Later steps render the review from this file, so a decision that is not in it does not exist.
+    Keep this list in task context, one block per finding; do not write a file. Later steps render the review from this context, so a decision that is not in it does not exist.
 3. Classify each reported finding from the list as one of the following: [high, medium, low, false, maybe-false], by following this process:
 
 3a. **Verify the finding's claim.**
@@ -71,7 +71,7 @@ Reject every `false` finding.
 Reject a `low` finding if it would be rarely visible to a user or developer, and the fix creates extra complexity - anything more than a direct correction or deletion.
 If you have a plan file for the change under review, reject any finding whose fix is to edit the intent section thereof.
 
-Once every finding has a verdict, update `{triage_file}` in one pass: each block gets its verdict and evidence, and a rejected finding stays in, marked rejected, with the reason.
+Once every finding has a verdict, update the in-context findings in one pass: each block gets its verdict and evidence, and a rejected finding stays in, marked rejected, with the reason.
 
 4. Group the findings you did not reject by the root cause
 Several raw review findings can say different things about what effectively is the same defect. At this point, you have learned enough to accurately deduplicate them. The idea is to turn them into a single finding per root cause, that carries the highest verdict of the group, but remembers which raw findings, from which sources it's based upon.
@@ -86,12 +86,12 @@ Several raw review findings can say different things about what effectively is t
    - `source` -- distinct sources of member findings joined with `+` (e.g., `blind-hunter+edge-case-hunter`)
    - `members` -- the `R` ids it is built from
 
-Order these deduplicated findings by verdict (highest first), and assign each of them with an `id`: `F` for "finding", followed by sequential number (`F1`, `F2` etc). Append them to `{triage_file}`.
+Order these deduplicated findings by verdict (highest first), and assign each of them with an `id`: `F` for "finding", followed by sequential number (`F1`, `F2` etc). Return them in the triage response.
 
 None of the member raw findings can be `false` - all these were rejected.
 A deduplicated finding which is a group of one should be identical to its single raw finding, except the `id`.
 
-5. `{triage_file}` is this step's output: every raw finding with its verdict and evidence, every rejection with its reason, and the `F` findings with their members. Check that nothing is missing before moving on.
+5. `{triage_context}` is this step's output: every raw finding with its verdict and evidence, every rejection with its reason, and the `F` findings with their members. Check that nothing is missing before moving on.
 
 ## NEXT
 

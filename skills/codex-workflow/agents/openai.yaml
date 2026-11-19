@@ -1,0 +1,5 @@
+interface:
+  display_name: "Codex Workflow"
+  short_description: "Workflow with repository rules and verified evidence"
+policy:
+  allow_implicit_invocation: true

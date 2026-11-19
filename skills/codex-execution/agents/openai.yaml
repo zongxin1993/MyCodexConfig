@@ -1,0 +1,5 @@
+interface:
+  display_name: "Codex Execution"
+  short_description: "Execution with repository rules and verified evidence"
+policy:
+  allow_implicit_invocation: true

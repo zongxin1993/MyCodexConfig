@@ -21,4 +21,12 @@ class PlanGateTests(unittest.TestCase):
    self.assertNotEqual(evaluate_plan(root,c,p,[r])['status'],'PASS')
    f['resolution_evidence']='contract:old';self.assertNotEqual(evaluate_plan(root,c,p,[r])['status'],'PASS')
    f['resolution_evidence']='contract:'+cid;self.assertEqual(evaluate_plan(root,c,p,[r])['status'],'PASS')
+ def test_neutral_role_and_legacy_alias_preserve_role_validation(self):
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td);(root/'source.txt').write_text('baseline');c,p=contract(),policy();cid=contract_id(c)
+   for name in ('plan-review','cloud-plan-review'):
+    r=review('plan',cid,'');r['reviewer']['agent']=name
+    self.assertEqual(evaluate_plan(root,c,p,[r])['status'],'PASS')
+   r['reviewer']['agent']='implementation-worker'
+   self.assertNotEqual(evaluate_plan(root,c,p,[r])['status'],'PASS')
 if __name__=='__main__':unittest.main()

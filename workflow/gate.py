@@ -6,6 +6,12 @@ from .review import validate_review, risk_score
 from .snapshot import snapshot
 from .files import safe_quality_dir
 
+# Legacy labels are artifact compatibility aliases, never model-routing directives.
+REVIEW_ROLES = {'plan': ('plan-review', 'cloud-plan-review'),
+                'code': ('code-review', 'cloud-review'),
+                'structure': ('structure-review', 'cloud-structure-review'),
+                'tests': ('test-review', 'cloud-test-review')}
+
 def accepted_debt(f):
     d = f['defer']
     if f['severity'] not in ('low', 'nit') or f['origin'] != 'preexisting' or f['disposition'] != 'defer' or not d:
@@ -63,7 +69,7 @@ def evaluate_plan(root, contract, policy, reviews):
     rounds, latest = history; current = latest.get('plan')
     if not current: return {'status': 'NEEDS_EVIDENCE', 'reasons': errors + ['Missing independent plan review']}
     errors += validate_review(current)
-    if current['reviewer']['agent'] != 'cloud-plan-review': errors.append('Plan reviewer role mismatch')
+    if current['reviewer']['agent'] not in REVIEW_ROLES['plan']: errors.append('Plan reviewer role mismatch')
     for f in current['findings']:
         if f['status'] == 'resolved' and f.get('resolution_evidence') != 'contract:' + cid:
             errors.append('Resolved plan finding lacks current contract verification')
@@ -116,9 +122,7 @@ def evaluate_gate(root, contract, policy, evidence, reviews):
         if invalid:
             errors += invalid; continue
         kind = review['kind']
-        expected_agent = {'plan': 'cloud-plan-review', 'code': 'cloud-review',
-                          'structure': 'cloud-structure-review', 'tests': 'cloud-test-review'}[kind]
-        if review['reviewer']['agent'] != expected_agent: errors.append('Reviewer role mismatch')
+        if review['reviewer']['agent'] not in REVIEW_ROLES[kind]: errors.append('Reviewer role mismatch')
         session = review['reviewer']['session']
         if session in sessions: errors.append('Independent review sessions required')
         sessions.add(session)

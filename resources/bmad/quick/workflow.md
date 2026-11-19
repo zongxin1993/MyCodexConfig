@@ -22,7 +22,7 @@ _None._
 
 Hold every entry below as fact for the whole run. Entries prefixed `file:` are paths or globs under `{project-root}` to read; the rest are facts verbatim (`_None._` means none):
 
-- Codex host adapter governs tools, persistence and evidence: no shell, no source/spec/plan writes; verify every alleged gap; missing lenses are incomplete; allow zero findings. Root coordinator dispatches flat sibling review sessions because host depth may be one; reviewer children never spawn children. Root returns actual sibling reports for triage. Reports return to root parent for verbatim archival only in .quality/reviews; implementer retains execution logs and repairs.
+- Codex host adapter governs tools, persistence and evidence: read-only native tools, no source/spec/plan writes; verify every alleged gap; missing lenses are incomplete; allow zero findings. Root coordinator dispatches flat sibling review sessions because host depth may be one; reviewer children never spawn children. Root returns actual sibling reports for triage. Reports return to the coordinator; only that coordinator may archive them in repository-authorized locations. The implementer retains execution logs and repairs.
 
 Then run each of these in order (`_None._` means skip):
 
@@ -33,4 +33,4 @@ _None._
 Read fully and follow `./step-01-gather-context.md`.
 
 ## Codex host authority
-Review is read-only. Read current source through native read tools or read-only shell. Never persist reports or child prompts. Return findings and missing-lens limitations to the coordinator. The coordinator archives approved evidence in the isolated worktree. If a required independent lens is unavailable, mark it incomplete; do not simulate a reviewer or claim a full review. The host permission boundary overrides all upstream write or halt instructions.
+Review is read-only. Read current source through native read tools or read-only shell. Never persist reports or child prompts. Return findings and missing-lens limitations to the coordinator. The coordinator may archive approved evidence only in repository-authorized locations; native projects need no .quality directory. If a required independent lens is unavailable, mark it incomplete; do not simulate a reviewer or claim a full review. The host permission boundary overrides all upstream write or halt instructions.

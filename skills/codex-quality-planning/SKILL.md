@@ -6,7 +6,7 @@ Managed-By: MyCodexConfig
 
 # Planning and acceptance
 
-Use the quality MCP tools actually exposed by this host: quality_onboard(project=<actual absolute project directory>), then quality_info. Onboarding writes only the separate Codex registry/backup; it neither grants access nor approves work. Read the selected project's authorities before creating files. Never use OpenCode's settings or runtime CLI.
+Use the quality MCP tools actually exposed by this host: quality_onboard(project=<actual absolute project directory>), then quality_info. Onboarding writes only the separate Codex registry/backup; it neither grants access nor approves work. Read the selected project's authorities before creating files. Never use OpenCode's settings or runtime CLI. If quality tools are absent, explicitly report that registration is unavailable; inspect repository rules with authorized native reads, keep planning in task context and do not invent a registry/gate response.
 
 Repository-native mode: keep the repository's own plan/evidence locations and verification commands. Do not generate portable contracts, `.quality` artifacts, synthetic snapshot IDs or generic PASS. Use requirements IDs, acceptance examples and reviewer findings in the authorized task context. quality_prepare/quality_gate returning REPOSITORY_NATIVE_REQUIRED means use native gates, not retry with a fabricated contract.
 

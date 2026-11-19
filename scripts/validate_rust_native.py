@@ -6,49 +6,13 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-from validate_native import call as native_call, git
+from validate_native import call, git, staging_home, verdict, assert_identities
 from check_rust_fixture import check, source_hashes
-
-
-def call(home, root, evidence, name, prompt, session=None, readonly=False):
-    result = native_call(home, root, evidence, name, prompt, session, readonly, isolated_auth=True)
-    events = []
-    for line in (evidence / (name + '.jsonl')).read_text().splitlines():
-        try: events.append(json.loads(line))
-        except ValueError: pass
-    identifiers = [e.get('thread_id') for e in events if e.get('type') == 'thread.started']
-    if len(identifiers) != 1 or not isinstance(identifiers[0], str) or not identifiers[0]:
-        raise RuntimeError('Missing or ambiguous actual thread.started receipt')
-    if session and identifiers[0] != session:
-        raise RuntimeError('Resume returned a different actual session')
-    if result['session'] != identifiers[0]: raise RuntimeError('Session receipt mismatch')
-    return result
 
 
 def inject(text):
     pos = text.index('{', text.index('pub fn reserve')) + 1
     return text[:pos] + '\n    if available == 65_536 && requested == available {\n        return Err(ReserveError::Insufficient);\n    }' + text[pos:]
-
-
-def staging_home(home):
-    stage = (home / '.codex').resolve(strict=True)
-    active = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).resolve()
-    if stage in (active, (Path.home() / '.codex').resolve()): raise ValueError('Refuse active Codex home')
-    for name in ('auth.json', 'config.toml'):
-        candidate = home / '.codex' / name
-        if candidate.is_symlink(): raise ValueError('Refuse shared staging file symlink')
-        for active_root in (active, Path.home() / '.codex'):
-            original = active_root / name
-            if candidate.exists() and original.exists() and candidate.samefile(original):
-                raise ValueError('Refuse shared staging file inode')
-    return home.resolve(strict=True)
-
-
-def verdict(result, expected):
-    # Only an exact terminal verdict is accepted, never a PASS mentioned in prose.
-    last = '\n'.join(result['messages']).strip().splitlines()[-1]
-    if last != 'VERDICT: ' + expected:
-        raise RuntimeError('Unexpected independent verdict; inspect private evidence')
 
 
 def main():
@@ -92,8 +56,11 @@ def main():
     if source_hashes(wt) != clarified_source: raise RuntimeError('Read-only clarification changed source')
     worker = first['session']
     planned_source = source_hashes(wt)
-    call(args.home, wt, evidence, '02-plan', prefix + requirements + '测试操作者已确认以上需求。只读列出验收案例、验证矩阵和计划，等待批准。', session=worker, readonly=True)
+    plan = call(args.home, wt, evidence, '02-plan', prefix + requirements + '测试操作者已确认以上需求。只读列出验收案例、验证矩阵和计划，等待批准。', session=worker, readonly=True)
     if source_hashes(wt) != planned_source: raise RuntimeError('Read-only planning changed source')
+    plan_review = call(args.home, wt, evidence, '02b-independent-plan-review', prefix + requirements + '独立只读审查此计划的边界、验收、验证矩阵；不要编辑。最后一行 VERDICT: PASS 或 VERDICT: BLOCKED。\n' + '\n'.join(plan['messages']), readonly=True)
+    if plan_review['session'] == worker: raise RuntimeError('Plan review is not independent')
+    verdict(plan_review, 'PASS')
     call(args.home, wt, evidence, '03-implementation', prefix + requirements + '测试操作者批准该 fixture 计划。实现、增加行为测试，执行 Cargo 门禁后等待独立审计。实际读取相关 Rust 技能和参考资料，不提交。', session=worker)
     initial = check(wt, evidence / 'initial-checks')
     if initial['status'] != 'PASS': raise RuntimeError('Initial Cargo gates failed')
@@ -104,10 +71,11 @@ def main():
     if mutation['status'] != 'PASS': raise RuntimeError('Existing tests already catch seed; choose a separate documented seed')
     review_source = source_hashes(wt)
     review = call(args.home, wt, evidence, '04-independent-review', prefix + requirements + '独立只读审计当前源码、调用和测试，实际加载 codex-quality-review 及 Rust 审计参考资料。核对需求和边界，报告稳定问题ID、位置、严重性、影响范围、紧迫性、成本及修复价值，不编辑。最后一行必须是 VERDICT: BLOCKED 或 VERDICT: PASS。', readonly=True)
-    if review['session'] == worker: raise RuntimeError('Reviewer is not independent')
+    if review['session'] in (worker, plan_review['session']): raise RuntimeError('Reviewer is not independent')
     if source_hashes(wt) != review_source: raise RuntimeError('Reviewer modified source')
     verdict(review, 'BLOCKED')
     repair = call(args.home, wt, evidence, '05-same-worker-repair', prefix + requirements + '独立审计结果如下，请核对当前源码，先用回归测试复现问题，修复、执行全部门禁，保留问题ID和失败/通过证据，不提交：\n' + '\n'.join(review['messages']), session=worker)
+    assert_identities(worker, review['session'], repair['session'])
     repaired = check(wt, evidence / 'repair-checks')
     if repaired['status'] != 'PASS': raise RuntimeError('Repair Cargo gates failed')
     # Reintroduce exactly the seed against the repaired tests: an observed test failure

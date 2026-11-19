@@ -36,11 +36,16 @@ class Runtime:
             raise ValueError('Settings must contain projects only')
         self.projects = {}
         self.integrations = {}
+        self.unavailable = {}
         for project in settings['projects']:
             if not isinstance(project, dict) or set(project) not in ({'root', 'policy'}, {'root', 'integration'}):
                 raise ValueError('Invalid registered project/policy')
-            root = Path(project['root']).resolve(strict=True)
-            if root == Path.home() or root == Path('/') or not root.is_dir():
+            if not isinstance(project['root'], str) or not Path(project['root']).is_absolute():
+                raise ValueError('Registered root must be absolute')
+            root = Path(project['root']).resolve()
+            unavailable = []
+            if not root.exists(): unavailable.append('Registered root is missing')
+            if root == Path.home() or root == Path('/') or (root.exists() and not root.is_dir()):
                 raise ValueError('Register a specific project, not home or filesystem root')
             if str(root) in self.projects: raise ValueError('Duplicate project')
             if 'integration' in project:
@@ -63,22 +68,26 @@ class Runtime:
                     for part in path.parts:
                         current /= part
                         if current.is_symlink(): raise ValueError('Symlink native authority refused')
-                    if not current.is_file() or root not in current.resolve().parents:
-                        raise ValueError('Missing/outside native authority')
+                    if root not in current.resolve().parents:
+                        raise ValueError('Outside native authority')
+                    if not current.is_file(): unavailable.append('Missing native authority: ' + name)
                     seen.add(name)
                 self.integrations[str(root)] = copy.deepcopy(profile)
                 self.projects[str(root)] = None
             else:
                 if check(project['policy'], 'policy'): raise ValueError('Invalid registered policy')
                 self.projects[str(root)] = project['policy']
+            if unavailable: self.unavailable[str(root)] = unavailable
     def root(self, project):
         self.refresh()
-        root = Path(project).resolve(strict=True)
+        root = Path(project).resolve()
+        if str(root) in self.unavailable:
+            raise ValueError('Registered project unavailable: ' + '; '.join(self.unavailable[str(root)]))
         if str(root) not in self.projects: raise ValueError('Project not registered')
         return root
     def info(self):
         self.refresh()
-        return {'projects': list(self.projects), 'tools_read_only': False,
+        return {'projects': list(self.projects), 'unavailable_projects': copy.deepcopy(self.unavailable), 'tools_read_only': False,
                 'registration_only_writes': True,
                 'project_profiles': {root: copy.deepcopy(self.integrations.get(root, {'mode': 'portable'}))
                                      for root in self.projects},
@@ -88,6 +97,7 @@ class Runtime:
         if self.settings_path is not None:
             current = Runtime(read_json(self.settings_path))
             self.projects, self.integrations = current.projects, current.integrations
+            self.unavailable = current.unavailable
     def onboard(self, project):
         if self.settings_path is None: raise ValueError('Persistent registry required for onboarding')
         from .registration import onboard

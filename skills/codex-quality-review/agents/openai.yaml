@@ -1,0 +1,5 @@
+interface:
+  display_name: "Codex Quality Review"
+  short_description: "Quality Review with repository rules and verified evidence"
+policy:
+  allow_implicit_invocation: true

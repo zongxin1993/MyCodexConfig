@@ -68,13 +68,9 @@ class RustReceiptTests(unittest.TestCase):
             self.assertEqual(set(payload), {'tools.py', 'examples/demo/Cargo.toml'})
 
     def test_missing_or_wrong_actual_session_is_rejected(self):
-        with tempfile.TemporaryDirectory() as td:
-            evidence = Path(td)
-            for events in ([], [{'type':'thread.started','thread_id':'other'}]):
-                (evidence / 'phase.jsonl').write_text('\n'.join(json.dumps(e) for e in events))
-                with patch.object(native, 'native_call', return_value={'session':'expected'}):
-                    with self.assertRaises(RuntimeError):
-                        native.call(Path(td), Path(td), evidence, 'phase', 'prompt', session='expected')
+        self.assertIs(native.call, shared_native.call)
+        for events in ([], [{'type':'thread.started','thread_id':'other'}]):
+            with self.assertRaises(RuntimeError): shared_native.actual_session(events, 'expected')
 
     def test_prose_pass_does_not_approve(self):
         with self.assertRaises(RuntimeError):
@@ -89,12 +85,12 @@ class RustReceiptTests(unittest.TestCase):
 
     def test_isolated_auth_uses_file_store_and_removes_standard_keys(self):
         with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+            root = Path(td); (root / '.codex').mkdir()
             def run(argv, **kwargs):
                 self.assertNotIn('OPENAI_API_KEY', kwargs['env'])
                 self.assertNotIn('CODEX_API_KEY', kwargs['env'])
                 self.assertIn('cli_auth_credentials_store="file"', argv)
-                self.assertEqual(kwargs['env']['CODEX_HOME'], str(root / '.codex'))
+                self.assertEqual(kwargs['env']['CODEX_HOME'], str(root.resolve() / '.codex'))
                 kwargs['stdout'].write(json.dumps({'type':'thread.started','thread_id':'fixture-session'}) + '\n')
                 return subprocess.CompletedProcess(argv, 0)
             with patch.dict(shared_native.os.environ, {'OPENAI_API_KEY':'fixture-value','CODEX_API_KEY':'fixture-value'}), patch.object(shared_native.subprocess, 'run', side_effect=run):

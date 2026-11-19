@@ -18,7 +18,7 @@ INSTRUCTIONS = (
     'confirmed task context and inspect the actual new project. Keep plans, approval quotes, '
     'review findings and progress in task context or the repository-authorized system. '
     'Do not create portable specs/contracts/.quality protocols or a competing acceptance authority. '
-    'Cloud plans and independently audits; the same local worker implements, tests and repairs. '
+    'A planner defines requirements; an independent reviewer audits; the implementation worker tests and repairs. No model or provider is implied by these responsibilities. '
     'Discover actual verification entry points and choose checks by task impact; no commands, '
     'dependencies, environments or passing evidence were approved or executed by registration. '
     'Preserve required independent review, issue severity/impact/confidence, repair value/cost '
@@ -95,16 +95,26 @@ def linked_registration(requested, settings):
                 text=True, stderr=subprocess.DEVNULL, timeout=10).strip().splitlines()
             return tuple(Path(p).resolve(strict=True) for p in value) if len(value) == 3 else None
         except (OSError, subprocess.SubprocessError): return None
+    from .runtime import Runtime
+    registry = Runtime(settings)
     paths = git_paths(requested)
     if paths is None: return None
     git_dir, common, checkout = paths
     if git_dir == common or common / 'worktrees' not in git_dir.parents: return None
     matches = []
     for project in settings['projects']:
-        source = Path(project['root']).resolve(strict=True); other = git_paths(source)
+        source = Path(project['root']).resolve()
+        # A removed registered subtree still belongs to its existing Git ancestor.
+        # Probe only the nearest existing ancestor, preserving nested Git boundaries.
+        probe = source
+        while not probe.exists() and probe.parent != probe:
+            probe = probe.parent
+        other = git_paths(probe)
         if other is None or other[1] != common: continue
         relative = source.relative_to(other[2]); mapped = checkout / relative
         if mapped != requested and mapped not in requested.parents: continue
+        if str(source) in registry.unavailable:
+            raise ValueError('Linked registered profile unavailable; restore its authorities before inheritance')
         entry = copy.deepcopy(project); entry['root'] = str(mapped)
         # Fixed executable policies must never accidentally run against the original checkout.
         for lane in entry.get('policy', {}).get('lanes', []):
@@ -132,6 +142,7 @@ def onboard(settings_path, project):
         ancestors = [Path(p) for p in current.projects if Path(p) == requested or Path(p) in requested.parents]
         if ancestors:
             root = max(ancestors, key=lambda p: len(p.parts))
+            current.root(str(root))
         else:
             inherited = linked_registration(requested, settings)
             if inherited:
@@ -145,7 +156,7 @@ def onboard(settings_path, project):
         updated = copy.deepcopy(settings)
         entry = inherited if inherited else {'root': str(root), 'integration': integration}
         updated['projects'].append(entry)
-        Runtime(updated)
+        Runtime(updated).root(str(root))
         backups = path.parent / 'backups'
         if backups.is_symlink(): raise ValueError('Symlink backup directory refused')
         backups.mkdir(mode=0o700, exist_ok=True)

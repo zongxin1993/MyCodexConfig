@@ -61,6 +61,16 @@ codex mcp list
 
 安装后在 **新 Codex 会话**中使用。已经运行的会话可能持有旧的工具/技能列表；不要为此重启正在工作的任务。Desktop 对用户级配置和 MCP 的加载以实际版本为准，可从新会话调用 `quality_info` 核验。
 
+### 自动发现与能力边界
+
+七项技能带有 `agents/openai.yaml`，允许根据普通需求隐式选择。隐式选择仍是模型行为；配置不能保证每次调用。工作流入口核对实际工具清单，并在 `quality_info` 已暴露时真正调用一次。缺少 MCP 时会明确报告降级，可通过原生只读工具读取安装 release 中的固定公开审计资源；不会把这些读取称为 MCP 调用，也不会伪造登记/门禁通过。
+
+失效的项目根目录或缺失规程会列入 `quality_info.unavailable_projects`。无关项目继续工作，失效项目及其关联 worktree 保持阻塞；恢复原目录/规程后重新检查即可。不会自动删除旧登记或改成较弱规则。无效配置和不安全路径仍直接拒绝。
+
+可移植审计职责使用 `plan-review`、`code-review`、`structure-review`、`test-review`；旧 `cloud-*` 标签仅为历史报告兼容，不选择模型。审计身份独立性和原门禁不变。
+
+Desktop 需要单独观察实际技能读取和工具调用，步骤见 [Desktop 验收](docs/validation/desktop-acceptance.md)。CLI 的隔离流程、MCP 配置和 subprocess 就绪检查均不能替代 Desktop 证明。
+
 ### 可选结构搜索
 
 已安装 `ast-grep` 时，将真实可执行文件路径传给安装器：
@@ -113,13 +123,13 @@ python3 -m unittest discover -s tests -v
 python3 scripts/validate_native.py --home /absolute/path/to/private-staging-home --fixture /absolute/path/to/new-private-fixture
 ```
 
-先在 staging home 建立独立 Codex 配置并安装本包，使用你授权的 Codex 登录；不要把 staging 凭据或原始会话日志提交到 Git。脚本会产生真实模型请求，固定为 `low` 推理档，只在一次性 fixture 中模拟需求/计划批准，并故意植入缺陷验证审计和同会话修复闭环。测试中禁用 Context7，文档查询另行验证。详见 `docs/validation/2026-11-19.md`。
+先在 staging home 建立独立 Codex 配置并安装本包，使用你授权的 Codex 登录；不要把 staging 凭据或原始会话日志提交到 Git。脚本会产生真实模型请求，固定为 `low` 推理档，只在一次性 fixture 中模拟需求/计划批准，并故意植入缺陷验证审计和同会话修复闭环。测试中禁用 Context7，文档查询另行验证。默认还要求普通需求实际读取完整技能并调用会话内 MCP，简单翻译不得启动工程流程。`--explicit-workflow` 仅用于显式调用的集成验证，不能作为隐式触发证明。独立计划评审阻塞时，合成测试会将发现交回原规划会话修订一次，再由原评审者复审；仍阻塞则停止。早期记录见 `docs/validation/2026-11-19.md`，本轮加固状态见 [加固验收](docs/validation/2026-11-19-hardening.md)。
 
 这套配置能加强规程和证据约束，不能保证每次任务无缺陷。CLI 的真实流程通过不代表已经逐屏验证 Desktop 交互，也不代表所有语言和大型项目均已验收。
 
 ## Rust 工程如何使用
 
-直接提出 Rust 需求即可，`codex-execution` 和审计入口会转到 `codex-rust-workflow`，按需读取 Cargo 与 Rust 审查参考；实际编译诊断继续用 `codex-rust-diagnostics`。先识别仓库的 toolchain、edition、MSRV、features、targets 和原生验证入口，再选择编译、Clippy、单元/集成/文档测试及必要的 release 测试。不会自动升级 Rust、依赖或强加 `--all-features`。
+可直接提出 Rust 需求；入口指导 `codex-execution` 和审计按任务选择 `codex-rust-workflow`，是否实际调用仍需查看会话工具回执。技能被选中后，按需读取 Cargo 与 Rust 审查参考；实际编译诊断继续用 `codex-rust-diagnostics`。先识别仓库的 toolchain、edition、MSRV、features、targets 和原生验证入口，再选择编译、Clippy、单元/集成/文档测试及必要的 release 测试。不会自动升级 Rust、依赖或强加 `--all-features`。
 
 新机器另需 Rust/Cargo，以及仓库要求的 Clippy、rustfmt；本包安装器不安装或修改工具链。缺工具会报告缺失环境。普通检查不能替代 MSRV、其他平台、并发恢复或 unsafe 专项证明。
 

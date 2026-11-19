@@ -1,0 +1,5 @@
+interface:
+  display_name: "Codex Rust Diagnostics"
+  short_description: "Rust Diagnostics with repository rules and verified evidence"
+policy:
+  allow_implicit_invocation: true

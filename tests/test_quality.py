@@ -12,7 +12,7 @@ def contract():
 def policy():
  return {'version':1,'lanes':[{'id':'tests','argv':[sys.executable,'-m','unittest','-v'],'parser':'unittest','timeout':5,'min_checks':1,'environment':'Current Python, stdlib unittest','required':True}]}
 def review(kind,cid,sid,findings=None):
- return {'version':1,'kind':kind,'contract_id':cid,'snapshot_id':sid,'reviewer':{'agent':'cloud-plan-review' if kind=='plan' else 'cloud-review','model':'cloud/model','session':'review-'+kind},'summary':'Independent inspected evidence','findings':findings or [],'rejections':[],'complete':True}
+ return {'version':1,'kind':kind,'contract_id':cid,'snapshot_id':sid,'reviewer':{'agent':'plan-review' if kind=='plan' else 'code-review','model':'selected/model','session':'review-'+kind},'summary':'Independent inspected evidence','findings':findings or [],'rejections':[],'complete':True}
 def finding(**changes):
  d={'id':'F-1','category':'correctness','location':'module.py:1','title':'Invalid input accepted','evidence':'Confirmed reachable call','consequence':'Wrong result','scope':'One API, callers named','confidence':'confirmed','severity':'high','origin':'introduced','disposition':'fix','status':'open','defer':None,'repair':{'value':'Prevents wrong result','effort':'small','regression_risk':'low','verification':'tests'},'risk':{'impact':5,'likelihood':3,'breadth':2,'time':4}}
  d.update(changes);return d
