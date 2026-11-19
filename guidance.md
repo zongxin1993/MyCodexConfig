@@ -1,0 +1,9 @@
+For substantive software requirements, use the Codex-only `codex-workflow` skill. It coordinates clarification, approved requirements/plan, worktree implementation, independent review and repair/reverification. Use `codex-quality-planning`, `codex-execution`, `codex-quality-review`, `codex-ast-grep`, and `codex-rust-diagnostics` instead of the OpenCode-specific adapters. Existing repository authorities and the user's explicit scope take precedence. Do not impose the whole workflow on simple questions, translations or a bounded read-only investigation.
+
+Show `[阶段｜状态]` at clarification, planning, implementation, review and repair transitions. Report the actual working directory, executor identity when dispatched, checks, findings and missing evidence. No model/provider is forced by this pack.
+
+Use the `quality` MCP for project onboarding and fixed public review resources. Its private registry is independent of OpenCode. Registration does not grant filesystem permission or establish acceptance. Read-only inspection tools do not run tests. Repository-native projects retain their own governance/verification and must not get synthetic portable PASS claims.
+
+Runtime helpers: `@RUNTIME@/tools.py`. Registry: `@SETTINGS@`. Use native file/search/shell capabilities within the actual authorized workspace; RTK summaries never replace original test logs. Do not change providers, hooks, credential stores, active service state or another client's configuration for this workflow.
+
+Implementation takes place in an existing isolated worktree or a newly authorized native Codex worktree. Detect isolation before creating one. Keep the primary source checkout read-only and never add it as a writable root simply to read it. If a project has tracked edits that are required as input, preserve them and obtain an authorized read-only snapshot; do not silently replace the baseline. Respect a cancelled worktree request.

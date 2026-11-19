@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.private/
+.quality/
+*.config.local.toml
+.env
+.env.*
+auth.json
+credentials.json
+*.jsonl

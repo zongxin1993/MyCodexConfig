@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/bmad-code-org/BMAD-METHOD.git",
+  "commit": "e435a22574fe55722841086e5566420178b98df3",
+  "release_line": "v7 preview pinned; not stable v6.12",
+  "adaptation": "Pinned rendered review resources inherited from MyOpenCodeConfig; paths sanitized, host wording adapted to Codex, review writes replaced or overridden by read-only host authority. Not an unmodified upstream distribution."
+}

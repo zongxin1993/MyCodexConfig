@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "generation_hash": "114bba173e822270233c",
+  "outputs": {
+    "references/claims-check.md": "7be5d35dd90a1950addc2062acdf8669026b239117efe1e398da1e8161cfa6f9",
+    "references/deletion-check.md": "0f1f124e4e957147e89164a272b10bedc694ad0d9ad2618c8610ac74ee9cb0da",
+    "review-prompts/edge-case-hunter.md": "5f4572d57340b4c0d155f33454d644a44af101cd7fd02a01591be68a4ebb8b7f",
+    "review-prompts/verification-gap.md": "3ba70ad39f8663b83c599814ad52f28bbbc50ddf137b4762037c9b30ed84a34e",
+    "step-01-gather-context.md": "3512bcbe575951a09023694acfa9ee1bdc0eb957f51227e51e6cb1cfb3741564",
+    "step-02-review.md": "56429466b3c8f5955dc1b80d17195fbcdd0cb2c3966ed4613ca50fe62b0fc35d",
+    "step-03-triage.md": "a13d8dccb6e42d06d8ee3259a2ee20d73e4b4286aec49b75d23e8264a5a0b630",
+    "step-04-route.md": "522158bda2dca94fb995635bffbb1bb538a4a74ddaa4f46a1466bf2962626a34",
+    "step-05-present.md": "0e6b9a0981675a45877f6794af36b55c275932e6fabc991ccc5aa8e350967e32",
+    "workflow.md": "462bc0956ae8b198c684cae7a4fab3e663ebdd190ccb147a5a99a817ab430b9d"
+  },
+  "source_render_hashes": {
+    "references/claims-check.md": "7be5d35dd90a1950addc2062acdf8669026b239117efe1e398da1e8161cfa6f9",
+    "references/deletion-check.md": "0f1f124e4e957147e89164a272b10bedc694ad0d9ad2618c8610ac74ee9cb0da",
+    "review-prompts/edge-case-hunter.md": "5f4572d57340b4c0d155f33454d644a44af101cd7fd02a01591be68a4ebb8b7f",
+    "review-prompts/verification-gap.md": "3ba70ad39f8663b83c599814ad52f28bbbc50ddf137b4762037c9b30ed84a34e",
+    "step-01-gather-context.md": "8dfbc9287eb5f5af133562230e08526ecda140eebaf723be341f17607d46c1f0",
+    "step-02-review.md": "c07db1b2d21a6c4cd68adb2a21d828c3b81740c47ad577248df9920e78201262",
+    "step-03-triage.md": "625627880210c5031f267fad3800edc73c1a34bec84392e5fa6d380a510dbe5f",
+    "step-04-route.md": "b839df2069ca261a592ce488b33ace083b270a9143e491957135aa6d2f81f42e",
+    "step-05-present.md": "38030ad632b611a63feac0f164c3595db1219b31bbaca0c5079866d73f93a1c7",
+    "workflow.md": "39b446acaab7f5436e7935a51b8c175d5cc534e08c5b1a7d553dca85c2a3573e"
+  },
+  "adaptation": "Codex read-only host adapter; host instructions override upstream persistence and unavailable delegation steps."
+}
