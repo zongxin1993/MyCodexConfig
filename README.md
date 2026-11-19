@@ -13,6 +13,7 @@
 | `codex-execution` | 原生搜索、必要时结构搜索、仓库原生测试、真实证据保留 |
 | `codex-quality-review` | 核对需求实现、结构、测试有效性；报告严重性、影响范围、紧迫性与修复价值 |
 | `codex-ast-grep` | 对已定位的明确源码文件做语法结构搜索 |
+| `codex-rust-workflow` | Rust 工具链/Cargo 矩阵、编译与 Clippy、行为测试及独立审计闭环 |
 | `codex-rust-diagnostics` | 针对实际 Rust 所有权、错误传播和并发诊断按需读取参考资料 |
 | `quality` MCP | 独立项目登记、固定公开 schema/BMAD 资源、可移植质量门禁；不执行任意 shell |
 | Context7 MCP | 查询第三方库官方文档；使用 Codex 自己的 OAuth 授权 |
@@ -43,7 +44,7 @@ python3 install.py
 
 - 在 `~/.codex/config.toml` 追加有边界标记的 `quality` / `context7` MCP 配置。
 - 在 `~/.codex/AGENTS.md` 追加工作流入口，保留已有内容。
-- 安装六个 `codex-*` skill 到 `~/.codex/skills/`。
+- 安装七个 `codex-*` skill 到 `~/.codex/skills/`。
 - 将运行文件放入 `~/.local/share/mycodexconfig/releases/<摘要>/`；项目登记独立保存在 `~/.config/mycodexconfig/settings.json`。
 - 仅在 Codex 的技能发现配置中禁用已知 OpenCode 专用同类适配器，避免调用不存在的工具；不编辑共享技能或 OpenCode。
 
@@ -115,3 +116,27 @@ python3 scripts/validate_native.py --home /absolute/path/to/private-staging-home
 先在 staging home 建立独立 Codex 配置并安装本包，使用你授权的 Codex 登录；不要把 staging 凭据或原始会话日志提交到 Git。脚本会产生真实模型请求，固定为 `low` 推理档，只在一次性 fixture 中模拟需求/计划批准，并故意植入缺陷验证审计和同会话修复闭环。测试中禁用 Context7，文档查询另行验证。详见 `docs/validation/2026-11-19.md`。
 
 这套配置能加强规程和证据约束，不能保证每次任务无缺陷。CLI 的真实流程通过不代表已经逐屏验证 Desktop 交互，也不代表所有语言和大型项目均已验收。
+
+## Rust 工程如何使用
+
+直接提出 Rust 需求即可，`codex-execution` 和审计入口会转到 `codex-rust-workflow`，按需读取 Cargo 与 Rust 审查参考；实际编译诊断继续用 `codex-rust-diagnostics`。先识别仓库的 toolchain、edition、MSRV、features、targets 和原生验证入口，再选择编译、Clippy、单元/集成/文档测试及必要的 release 测试。不会自动升级 Rust、依赖或强加 `--all-features`。
+
+新机器另需 Rust/Cargo，以及仓库要求的 Clippy、rustfmt；本包安装器不安装或修改工具链。缺工具会报告缺失环境。普通检查不能替代 MSRV、其他平台、并发恢复或 unsafe 专项证明。
+
+无依赖小工程示例在 `examples/rust-reservation/`。本机或 CI 原生验证：
+
+```sh
+python3 scripts/check_rust_fixture.py --root examples/rust-reservation --evidence /absolute/path/to/new-private-evidence
+```
+
+真实 low 会话闭环（需要独立 staging home 已安装本包、经授权的 Codex 登录，以及 PATH 中的 codex/cargo/rustc/clippy/rustfmt）：
+
+```sh
+python3 scripts/validate_rust_native.py --home /absolute/path/to/private-staging-home --fixture /absolute/path/to/new-private-rust-fixture
+```
+
+脚本验证编译/Clippy 负向控制、需求澄清、计划、隔离实施、独立审计、原会话修复和复审；模型请求固定 `low`，不修改用户默认档位。审计结论须以独立消息的精确终行返回；完整日志及源码摘要留在私有目录，禁止上传凭据或原始会话。CI 只运行原生 Cargo/Python 验证，不运行需要账户的模型会话。
+
+Rust 真实会话 harness 拒绝活动 Codex home 及共享认证文件链接，使用 staging 文件认证并剥离继承的 `OPENAI_API_KEY` / `CODEX_API_KEY`。使用自定义 provider 的其他认证环境或外部凭据代理时，须先单独隔离；该脚本不提供任意 provider 的凭据隔离保证。
+
+本轮 Rust 的真实执行、负向控制及适配审计记录见 [Rust 验收记录](docs/validation/2026-11-19-rust.md)。

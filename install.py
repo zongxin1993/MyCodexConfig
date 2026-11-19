@@ -56,7 +56,7 @@ def payload(ast_grep=None):
     paths = [ROOT / 'tools.py']
     for directory in ('workflow', 'schemas', 'examples', 'resources', 'skills'):
         paths.extend(p for p in (ROOT / directory).rglob('*')
-                     if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')
+                     if p.is_file() and not any(part in ('__pycache__', 'target', '.private', '.git') for part in p.relative_to(ROOT).parts) and p.suffix != '.pyc')
     result = {p.relative_to(ROOT).as_posix(): p.read_bytes() for p in sorted(paths)}
     if ast_grep is not None:
         binary = Path(ast_grep).resolve(strict=True)

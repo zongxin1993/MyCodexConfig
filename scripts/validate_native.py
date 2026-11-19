@@ -13,10 +13,14 @@ def git(root, *args):
     return subprocess.check_output(['git', '-C', str(root), *args], text=True, stderr=subprocess.DEVNULL).strip()
 
 
-def call(home, root, evidence, name, prompt, session=None, readonly=False):
+def call(home, root, evidence, name, prompt, session=None, readonly=False, isolated_auth=False):
     env = os.environ.copy(); env['CODEX_HOME'] = str(home / '.codex')
+    if isolated_auth:
+        for key in ('OPENAI_API_KEY', 'CODEX_API_KEY'):
+            env.pop(key, None)
     argv = ['codex', 'exec', '-C', str(root), '-s', 'read-only' if readonly else 'workspace-write',
             '-c', 'model_reasoning_effort="low"', '-c', 'mcp_servers.context7.enabled=false']
+    if isolated_auth: argv += ['-c', 'cli_auth_credentials_store="file"']
     if session: argv += ['resume', '--json', session, '-']
     else: argv += ['--trust', '--json', '-']
     path = evidence / (name + '.jsonl')

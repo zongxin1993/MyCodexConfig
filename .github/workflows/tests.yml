@@ -12,3 +12,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m unittest discover -s tests -v
+  rust-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
+      - run: python3 scripts/check_rust_fixture.py --root examples/rust-reservation --evidence /tmp/rust-evidence
